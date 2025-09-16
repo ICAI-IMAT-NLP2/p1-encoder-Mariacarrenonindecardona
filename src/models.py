@@ -25,7 +25,7 @@ class AttentionHead(nn.Module):
     def __init__(self, d_model: int, d_k: int, d_q: int, d_v: int):
         super(AttentionHead, self).__init__()
 
-        self.wq = nn.Linear(d_model, d_q) # PROJECT INPUT TO QUERY VECTORS
+        self.wq = nn.Linear(d_model, d_q)  # PROJECT INPUT TO QUERY VECTORS
         self.wk = nn.Linear(d_model, d_k)
         self.wv = nn.Linear(d_model, d_v)
 
@@ -47,10 +47,12 @@ class AttentionHead(nn.Module):
 
         # Calculate the dot product between query and the transpose of key.
         # The result is then scaled by the square root of dim_k.
-        scores = torch.matmul(q,k.transpose(1,2)) / torch.sqrt(torch.tensor(dim_k)) # TIENES UNA MATRIZ dlenxdq Y OTRA MATRIZ dkxdlen. COMO QUIRES UNA PALABRA dlenxdlen, TENEMOS QUE MODIFICAR LAS MATRICES PARA MULTIPLICAR dlenxdq * dkxdlen POR ESO TRASPONEMOS ASI
+        scores = torch.matmul(q, k.transpose(1, 2)) / torch.sqrt(
+            torch.tensor(dim_k)
+        )  # TIENES UNA MATRIZ dlenxdq Y OTRA MATRIZ dkxdlen. COMO QUIRES UNA PALABRA dlenxdlen, TENEMOS QUE MODIFICAR LAS MATRICES PARA MULTIPLICAR dlenxdq * dkxdlen POR ESO TRASPONEMOS ASI
 
         # Apply the softmax function to obtain the attention weights.
-        weights = torch.softmax(scores,-1)
+        weights = torch.softmax(scores, -1)
 
         # Compute the output by performing a weighted sum of the value tensor
         # using the attention weights.
@@ -72,9 +74,10 @@ class AttentionHead(nn.Module):
         k = self.wk(x)
         v = self.wv(x)
 
-        output, _ = self.scaled_dot_product_attention(q,k,v)
+        output, _ = self.scaled_dot_product_attention(q, k, v)
 
         return output
+
 
 class MultiHeadAttention(nn.Module):
     """Multi-Head Attention mechanism.
@@ -94,9 +97,16 @@ class MultiHeadAttention(nn.Module):
     def __init__(self, d_model: int, num_attention_heads: int):
         super(MultiHeadAttention, self).__init__()
 
-        dim = d_model//num_attention_heads # VIENE EXPLICADO EN EL PDF, "You should also set the sizes of the key, query and value vectors in this way: dk = dq = dv = dmodel numheads."
-        self.heads = nn.ModuleList([AttentionHead(d_model, d_k=dim, d_q=dim, d_v=dim) for i in range(num_attention_heads)])
-        self.output_linear = nn.Linear(dim*num_attention_heads, d_model)
+        dim = (
+            d_model // num_attention_heads
+        )  # VIENE EXPLICADO EN EL PDF, "You should also set the sizes of the key, query and value vectors in this way: dk = dq = dv = dmodel numheads."
+        self.heads = nn.ModuleList(
+            [
+                AttentionHead(d_model, d_k=dim, d_q=dim, d_v=dim)
+                for i in range(num_attention_heads)
+            ]
+        )
+        self.output_linear = nn.Linear(dim * num_attention_heads, d_model)
 
     def forward(self, hidden_state):
         """Forward pass for the multi-head attention layer.
@@ -107,18 +117,21 @@ class MultiHeadAttention(nn.Module):
         Returns:
             Tensor: Output tensor of shape (batch_size, seq_len, d_model).
         """
-        #d_model = hidden_state[-1]
+        # d_model = hidden_state[-1]
         d_model = hidden_state.shape[-1]
         num_attention_heads = len(self.heads)
-        
+
         if d_model % num_attention_heads != 0:
             raise RuntimeError("d_model not divisible by heads")
-        
+
         outputs = [head(hidden_state) for head in self.heads]
-        concatenated_outputs = torch.concat(outputs, dim=-1) # CONCATENO LA ULTIMA DIMENSION PORQUE ES DONDE ESTAN TODOS LOS RESULTADOS DE LAS ATTENTION HEAD
+        concatenated_outputs = torch.concat(
+            outputs, dim=-1
+        )  # CONCATENO LA ULTIMA DIMENSION PORQUE ES DONDE ESTAN TODOS LOS RESULTADOS DE LAS ATTENTION HEAD
         x = self.output_linear(concatenated_outputs)
         return x
-    
+
+
 class FeedForward(nn.Module):
     """FeedForward module for the Transformer.
 
@@ -154,6 +167,7 @@ class FeedForward(nn.Module):
         x = self.gelu(x)
         x = self.linear_2(x)
         return x
+
 
 class TransformerEncoderLayer(nn.Module):
     """Transformer Encoder Layer.
@@ -194,13 +208,14 @@ class TransformerEncoderLayer(nn.Module):
         hidden_state = self.layer_norm_1(x)
         attention_out = self.attention(hidden_state)
         x = x + attention_out
-        
+
         # Apply layer normalization and then apply feed-forward network
         hidden_state = self.layer_norm_2(x)
         feed_forward_out = self.feed_forward(hidden_state)
         x = x + feed_forward_out
-        
+
         return x
+
 
 class Embeddings(nn.Module):
     """Embeddings module for the Transformer.
@@ -236,7 +251,9 @@ class Embeddings(nn.Module):
         """
         # Generate position IDs based on the input sequence length
         seq_length = input_ids.size(1)
-        position_ids = torch.arange(seq_length, dtype=torch.long, device=input_ids.device).unsqueeze(0)
+        position_ids = torch.arange(
+            seq_length, dtype=torch.long, device=input_ids.device
+        ).unsqueeze(0)
 
         # Create token and position embeddings
         token_embeddings = self.token_embeddings(input_ids)
@@ -247,7 +264,8 @@ class Embeddings(nn.Module):
         embeddings = self.layer_norm(embeddings)
 
         return embeddings
-    
+
+
 class TransformerEncoder(nn.Module):
     """Transformer Encoder.
 
@@ -267,14 +285,22 @@ class TransformerEncoder(nn.Module):
         layers (nn.ModuleList): List of Transformer encoder layers.
     """
 
-    def __init__(self, vocab_size: int, max_position_embeddings: int, d_model: int,
-                num_attention_heads: int, intermediate_size: int, num_hidden_layers: int
-                 ):
+    def __init__(
+        self,
+        vocab_size: int,
+        max_position_embeddings: int,
+        d_model: int,
+        num_attention_heads: int,
+        intermediate_size: int,
+        num_hidden_layers: int,
+    ):
         super(TransformerEncoder, self).__init__()
         self.embeddings = Embeddings(vocab_size, max_position_embeddings, d_model)
         self.layers = nn.ModuleList(
-            [TransformerEncoderLayer(d_model, num_attention_heads, intermediate_size)
-             for _ in range(num_hidden_layers)]
+            [
+                TransformerEncoderLayer(d_model, num_attention_heads, intermediate_size)
+                for _ in range(num_hidden_layers)
+            ]
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -290,7 +316,8 @@ class TransformerEncoder(nn.Module):
         for layer in self.layers:
             x = layer(x)
         return x
-    
+
+
 class ClassificationHead(nn.Module):
     """Classification head for the Transformer model.
 
@@ -324,7 +351,8 @@ class ClassificationHead(nn.Module):
         x = self.dropout(x)
         x = self.linear(x)
         return x
-    
+
+
 class TransformerForSequenceClassification(nn.Module):
     """Transformer model with a classification head on top for sequence classification.
 
@@ -343,9 +371,17 @@ class TransformerForSequenceClassification(nn.Module):
         classifier (ClassificationHead): The classification head on top of the Transformer encoder.
     """
 
-    def __init__(self, vocab_size: int, max_position_embeddings: int, d_model: int,
-                num_attention_heads: int, intermediate_size: int, num_hidden_layers: int,
-                num_classes: int, dropout_prob: float):
+    def __init__(
+        self,
+        vocab_size: int,
+        max_position_embeddings: int,
+        d_model: int,
+        num_attention_heads: int,
+        intermediate_size: int,
+        num_hidden_layers: int,
+        num_classes: int,
+        dropout_prob: float,
+    ):
         super(TransformerForSequenceClassification, self).__init__()
         self.transformer_encoder = TransformerEncoder(
             vocab_size=vocab_size,
@@ -361,7 +397,6 @@ class TransformerForSequenceClassification(nn.Module):
             dropout_prob=dropout_prob,
         )
 
-
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         """Forward pass through the Transformer model with classification head.
 
@@ -376,7 +411,7 @@ class TransformerForSequenceClassification(nn.Module):
 
         # Use the first token's output (e.g., CLS token) for classification
         x = x[:, 0, :]
-        
+
         # Pass through the classification head
         x = self.classifier(x)
         return x
